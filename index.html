@@ -209,9 +209,33 @@
     /* Manifesto */
     .manifesto{ background:var(--blue); }
     .manifesto__wrap{ padding: clamp(40px, 5vw, 64px) 0; }
-    .manifesto__text{
-      width: min(56ch, 50%);
+    .manifesto__grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: clamp(18px, 3vw, 34px);
+      align-items:start;
       margin-top: 18px;
+    }
+    .manifesto__text{
+      width:100%;
+      max-width:56ch;
+      margin:0;
+    }
+    .manifesto__frame{
+      width:100%;
+      aspect-ratio: 16 / 9;
+      border:0;
+      border-radius: var(--radius);
+      overflow:hidden;
+      box-shadow: 0 18px 60px rgba(0,0,0,.28);
+      background: rgba(255,255,255,.06);
+    }
+    .manifesto__frame video{
+      width:100%;
+      height:100%;
+      object-fit: contain;
+      display:block;
+      background:#000;
     }
     .manifesto__line{
       font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
@@ -480,7 +504,8 @@
       .hero__grid{ grid-template-columns: 1fr; }
       .hero__image{ height: min(64vh, 640px); }
       .section__head{ flex-direction:column; align-items:flex-start; }
-      .manifesto__text{ width:100%; }
+      .manifesto__grid{ grid-template-columns: 1fr; }
+      .manifesto__text{ max-width:none; }
       .seriesNav{ display:none; }
     }
   </style>
@@ -557,10 +582,17 @@
       <div class="container">
         <div class="manifesto__wrap">
           <h2 class="h2 invert reveal" data-reveal></h2>
-          <div class="manifesto__text">
-            <p class="manifesto__line reveal" data-reveal data-byline>Ты уже другой, чем привык видеть себя.</p>
-            <p class="manifesto__line reveal" data-reveal data-byline>Образ — это не украшение.</p>
-            <p class="manifesto__line reveal" data-reveal data-byline>Это момент узнавания.</p>
+
+          <div class="manifesto__grid">
+            <div class="manifesto__text">
+              <p class="manifesto__line reveal" data-reveal data-byline>Ты уже другой, чем привык видеть себя.</p>
+              <p class="manifesto__line reveal" data-reveal data-byline>Образ — это не украшение.</p>
+              <p class="manifesto__line reveal" data-reveal data-byline>Это момент узнавания.</p>
+            </div>
+
+            <div class="manifesto__frame reveal" data-reveal aria-label="Видео">
+              <video id="manifestoVideo" controls playsinline preload="metadata"></video>
+            </div>
           </div>
         </div>
       </div>
@@ -747,6 +779,26 @@
         if (e.key === "ArrowLeft") prev();
         if (e.key === "ArrowRight") next();
       });
+    })();
+
+    // Manifesto video (Yandex Disk public link -> direct mp4 href)
+    (() => {
+      const video = document.getElementById("manifestoVideo");
+      if (!video) return;
+
+      const publicKey = "https://disk.yandex.ru/i/JgtBds7fBXOZCg";
+      const api = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=" + encodeURIComponent(publicKey);
+
+      fetch(api)
+        .then((r) => r.ok ? r.json() : Promise.reject(new Error("Video API error")))
+        .then((data) => {
+          const href = data && data.href;
+          if (!href) return;
+          video.src = href;
+        })
+        .catch(() => {
+          // Silent fail: keep empty player if API blocked
+        });
     })();
 
     // Series controls (o1..o4): snap-scroll + arrows + dots
