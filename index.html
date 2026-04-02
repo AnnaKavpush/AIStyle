@@ -237,6 +237,25 @@
       display:block;
       background:#000;
     }
+    .manifesto__frame.is-fallback video{ display:none; }
+    .manifesto__videoFallback{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height:100%;
+      min-height: 180px;
+      margin:0;
+      padding: 18px;
+      text-align:center;
+      font-size: 15px;
+      line-height:1.5;
+      color: rgba(255,255,255,.88);
+    }
+    .manifesto__videoFallback a{
+      color: rgba(255,255,255,.95);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
     .manifesto__line{
       font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
       font-size: clamp(20px, 2.2vw, 30px);
@@ -590,8 +609,12 @@
               <p class="manifesto__line reveal" data-reveal data-byline>Это момент узнавания.</p>
             </div>
 
-            <div class="manifesto__frame reveal" data-reveal aria-label="Видео">
-              <video id="manifestoVideo" controls playsinline preload="metadata"></video>
+            <div class="manifesto__frame reveal" id="manifestoFrame" data-reveal aria-label="Видео">
+              <video id="manifestoVideo" controls playsinline preload="metadata" referrerpolicy="no-referrer"></video>
+              <p id="manifestoVideoFallback" class="manifesto__videoFallback" hidden>
+                Видео не удалось загрузить с этой страницы.
+                <a href="https://disk.yandex.ru/i/JgtBds7fBXOZCg" target="_blank" rel="noopener noreferrer">Открыть на Яндекс.Диске</a>
+              </p>
             </div>
           </div>
         </div>
@@ -781,24 +804,54 @@
       });
     })();
 
-    // Manifesto video (Yandex Disk public link -> direct mp4 href)
+    // Manifesto video: локальный файл (надёжно на GitHub Pages) или ссылка с API Яндекс.Диска
     (() => {
       const video = document.getElementById("manifestoVideo");
-      if (!video) return;
+      const frame = document.getElementById("manifestoFrame");
+      const fallback = document.getElementById("manifestoVideoFallback");
+      if (!video || !frame) return;
 
-      const publicKey = "https://disk.yandex.ru/i/JgtBds7fBXOZCg";
-      const api = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=" + encodeURIComponent(publicKey);
+      const publicPage = "https://disk.yandex.ru/i/JgtBds7fBXOZCg";
+      const api = "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key=" + encodeURIComponent(publicPage);
+      const localSrc = new URL("assets/video/manifesto.mp4", window.location.href).href;
 
-      fetch(api)
-        .then((r) => r.ok ? r.json() : Promise.reject(new Error("Video API error")))
-        .then((data) => {
+      const showFallback = () => {
+        frame.classList.add("is-fallback");
+        if (fallback) fallback.hidden = false;
+      };
+
+      const tryLocal = async () => {
+        try {
+          const r = await fetch(localSrc, { method: "HEAD", cache: "no-store" });
+          if (!r.ok) return false;
+          video.src = localSrc;
+          video.addEventListener("error", showFallback, { once: true });
+          return true;
+        } catch (_) {
+          return false;
+        }
+      };
+
+      const tryYandex = async () => {
+        try {
+          const r = await fetch(api, { credentials: "omit", mode: "cors", cache: "no-store" });
+          if (!r.ok) return false;
+          const data = await r.json();
           const href = data && data.href;
-          if (!href) return;
+          if (!href) return false;
           video.src = href;
-        })
-        .catch(() => {
-          // Silent fail: keep empty player if API blocked
-        });
+          video.addEventListener("error", showFallback, { once: true });
+          return true;
+        } catch (_) {
+          return false;
+        }
+      };
+
+      (async () => {
+        if (await tryLocal()) return;
+        if (await tryYandex()) return;
+        showFallback();
+      })();
     })();
 
     // Series controls (o1..o4): snap-scroll + arrows + dots
