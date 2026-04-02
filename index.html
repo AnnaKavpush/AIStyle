@@ -367,7 +367,7 @@
     /* Lightbox */
     .lightbox{
       position:fixed; inset:0;
-      z-index:100;
+      z-index:400;
       background: rgba(10,28,58,.92);
       display:none;
       align-items:center;
@@ -403,6 +403,14 @@
     }
     .lightbox__nav--prev{ left:18px; }
     .lightbox__nav--next{ right:18px; }
+
+    /* Series card as button (click to preview) */
+    button.seriesCard{
+      border:0;
+      padding:0;
+      background:transparent;
+      cursor:pointer;
+    }
 
     /* Loader */
     .loader{
@@ -569,10 +577,10 @@
 
       <div class="seriesWrap" aria-label="Серия образов">
         <div class="seriesTrack" id="seriesTrack">
-          <figure class="seriesCard reveal" data-reveal><img src="assets/img/o1.png" alt="Образ 01" loading="lazy" decoding="async" /></figure>
-          <figure class="seriesCard reveal" data-reveal><img src="assets/img/o2.png" alt="Образ 02" loading="lazy" decoding="async" /></figure>
-          <figure class="seriesCard reveal" data-reveal><img src="assets/img/o3.png" alt="Образ 03" loading="lazy" decoding="async" /></figure>
-          <figure class="seriesCard reveal" data-reveal><img src="assets/img/o4.png" alt="Образ 04" loading="lazy" decoding="async" /></figure>
+          <button class="seriesCard reveal" data-reveal data-lightbox="assets/img/o1.png" data-lightbox-group="series" type="button" aria-label="Открыть предпросмотр: Образ 01"><img src="assets/img/o1.png" alt="Образ 01" loading="lazy" decoding="async" /></button>
+          <button class="seriesCard reveal" data-reveal data-lightbox="assets/img/o2.png" data-lightbox-group="series" type="button" aria-label="Открыть предпросмотр: Образ 02"><img src="assets/img/o2.png" alt="Образ 02" loading="lazy" decoding="async" /></button>
+          <button class="seriesCard reveal" data-reveal data-lightbox="assets/img/o3.png" data-lightbox-group="series" type="button" aria-label="Открыть предпросмотр: Образ 03"><img src="assets/img/o3.png" alt="Образ 03" loading="lazy" decoding="async" /></button>
+          <button class="seriesCard reveal" data-reveal data-lightbox="assets/img/o4.png" data-lightbox-group="series" type="button" aria-label="Открыть предпросмотр: Образ 04"><img src="assets/img/o4.png" alt="Образ 04" loading="lazy" decoding="async" /></button>
         </div>
 
         <button class="seriesNav seriesNav--prev" type="button" id="seriesPrev" aria-label="Предыдущий образ">‹</button>
@@ -679,14 +687,29 @@
       const closeBtn = qs("#lbClose");
       const prevBtn = qs("#lbPrev");
       const nextBtn = qs("#lbNext");
-      const tiles = qsa("[data-lightbox]");
+      const items = qsa("[data-lightbox]");
 
-      if (!lb || !img || tiles.length === 0) return;
+      if (!lb || !img || items.length === 0) return;
 
-      const sources = tiles.map(t => t.getAttribute("data-lightbox"));
+      const getGroup = (el) => el.getAttribute("data-lightbox-group") || "gallery";
+      const groups = new Map();
+      items.forEach((el) => {
+        const g = getGroup(el);
+        if (!groups.has(g)) groups.set(g, []);
+        groups.get(g).push(el);
+      });
+
+      let currentGroup = "gallery";
+      let currentItems = groups.get(currentGroup) || [];
+      let sources = currentItems.map(t => t.getAttribute("data-lightbox"));
       let idx = 0;
 
-      const open = (i) => {
+      const open = (i, groupName) => {
+        currentGroup = groupName || currentGroup;
+        currentItems = groups.get(currentGroup) || [];
+        sources = currentItems.map(t => t.getAttribute("data-lightbox"));
+        if (sources.length === 0) return;
+
         idx = (i + sources.length) % sources.length;
         img.src = sources[idx];
         lb.classList.add("is-open");
@@ -704,7 +727,14 @@
       const prev = () => open(idx - 1);
       const next = () => open(idx + 1);
 
-      tiles.forEach((t, i) => t.addEventListener("click", () => open(i)));
+      items.forEach((t) => {
+        t.addEventListener("click", () => {
+          const groupName = getGroup(t);
+          const list = groups.get(groupName) || [];
+          const i = Math.max(0, list.indexOf(t));
+          open(i, groupName);
+        });
+      });
       closeBtn.addEventListener("click", close);
       prevBtn.addEventListener("click", prev);
       nextBtn.addEventListener("click", next);
