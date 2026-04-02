@@ -610,7 +610,7 @@
             </div>
 
             <div class="manifesto__frame reveal" id="manifestoFrame" data-reveal aria-label="Видео">
-              <video id="manifestoVideo" controls playsinline preload="metadata" referrerpolicy="no-referrer"></video>
+              <video id="manifestoVideo" controls playsinline preload="metadata"></video>
               <p id="manifestoVideoFallback" class="manifesto__videoFallback" hidden>
                 Видео не удалось загрузить с этой страницы.
                 <a href="https://disk.yandex.ru/i/JgtBds7fBXOZCg" target="_blank" rel="noopener noreferrer">Открыть на Яндекс.Диске</a>
@@ -804,7 +804,7 @@
       });
     })();
 
-    // Manifesto video: локальный файл (надёжно на GitHub Pages) или ссылка с API Яндекс.Диска
+    // Manifesto video: сначала локальный assets/video/manifesto.mp4 (надёжно на GitHub Pages), иначе API Яндекс.Диска
     (() => {
       const video = document.getElementById("manifestoVideo");
       const frame = document.getElementById("manifestoFrame");
@@ -820,36 +820,48 @@
         if (fallback) fallback.hidden = false;
       };
 
-      const tryLocal = async () => {
-        try {
-          const r = await fetch(localSrc, { method: "HEAD", cache: "no-store" });
-          if (!r.ok) return false;
-          video.src = localSrc;
-          video.addEventListener("error", showFallback, { once: true });
-          return true;
-        } catch (_) {
-          return false;
-        }
-      };
+      const waitVideo = (src) => new Promise((resolve) => {
+        const onOk = () => {
+          video.removeEventListener("error", onFail);
+          cleanup();
+          resolve(true);
+        };
+        const onFail = () => {
+          cleanup();
+          resolve(false);
+        };
+        const cleanup = () => {
+          video.removeEventListener("canplay", onOk);
+          video.removeEventListener("error", onFail);
+        };
+        video.src = src;
+        video.addEventListener("canplay", onOk, { once: true });
+        video.addEventListener("error", onFail, { once: true });
+      });
 
-      const tryYandex = async () => {
-        try {
-          const r = await fetch(api, { credentials: "omit", mode: "cors", cache: "no-store" });
-          if (!r.ok) return false;
-          const data = await r.json();
-          const href = data && data.href;
-          if (!href) return false;
-          video.src = href;
-          video.addEventListener("error", showFallback, { once: true });
-          return true;
-        } catch (_) {
-          return false;
-        }
+      const clearVideo = () => {
+        video.removeAttribute("src");
+        video.load();
       };
 
       (async () => {
-        if (await tryLocal()) return;
-        if (await tryYandex()) return;
+        if (await waitVideo(localSrc)) {
+          video.addEventListener("error", showFallback, { once: true });
+          return;
+        }
+        clearVideo();
+        try {
+          const r = await fetch(api, { credentials: "omit", mode: "cors", cache: "no-store" });
+          if (!r.ok) throw new Error("api");
+          const data = await r.json();
+          const href = data && data.href;
+          if (!href) throw new Error("href");
+          if (await waitVideo(href)) {
+            video.addEventListener("error", showFallback, { once: true });
+            return;
+          }
+        } catch (_) {}
+        clearVideo();
         showFallback();
       })();
     })();
